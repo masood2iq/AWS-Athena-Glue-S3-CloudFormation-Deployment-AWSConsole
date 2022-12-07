@@ -1,2 +1,2 @@
 # AWS_Athena_Glue_S3_CloudFormation_Deployment_AWSConsole
-S3 buckets with AWS Athena, Glue CloudFormation Deployment through AWS console
+AWS Athena, Glue Database, Glue Crawler and S3 buckets deployment through CloudFormation stack on AWS console.
