@@ -221,68 +221,97 @@ The same way you can change the resources name as you required with their specif
 ## Step - 2
 Login to your AWS account and go to the CloudFormation console and select the nearest working region in which you want to deploy your infrastructure stack.
 
-You can also deploy your stack through AWS CLI command
-
+You can also deploy your stack through AWS CLI command.
 `aws cloudformation create-stack --stack-name Athena-infrastructure --template-body file://./file-name.yml`
 
-And from AWS console
-![](./images/image7.png)
+And from AWS GUI console
 ![](./images/image14.png)
 
 Click on the "Create stack" button, select "Template is ready".
 In the "Specify template" panel, select the "Upload a template file", and "Choose file" buttons to select your file, and click the "Next" button
-![](./images/image22.png)
+![](./images/image20.png)
 
-Provide the “Stack name” and as you can see Parameters are already defined which we provided through YAML file, click the “Next” button
-![](./images/image23.png)
-
-Rest of all leave as default and click “Next”
-![](./images/image14.png)
-
-Review the things, acknowledge and click the “Submit” button.
-![](./images/image24.png)
-![](./images/image4.png)
-
-After successfully deploying, you can check the resources created by the stack.
-![](./images/image12.png)
-
-Also, you can check the output with export names.
-![](./images/image13.png)
-
-## Step - 3
-Now go to AWS Glue console, on left side panel click on “Crawlers”
-![](./images/image3.png)
-![](./images/image2.png)
-
-Select the created crawler and click the “Run” button. The crawler will take some time to complete and create a metadata table.
-![](./images/image5.png)
-
-When you click on the crawler that takes you to its detail page.
-
-## Step - 3
-On another side, you can check the crawler logs and table by going through the CloudWatch logs console and Glue console, Tables.
-![](./images/image1.png)
-![](./images/image21.png)
+Provide the “Stack name”, “Environment” and click “Next” button
 ![](./images/image10.png)
 
-For Tables in AWS Glue
-![](./images/image8.png)
-![](./images/image18.png)
+Leave as default and click “Next” button
+![](./images/image12.png)
 
-## Step - 4
-Now finally go to AWS Athena console, select query editor, and from the left top drop-down menu select your workgroup where you can see your database and table details.
+Review your stack, check “I acknowledge” and click “Submit” button
+![](./images/image24.png)
+![](./images/image26.png)
+
+CloudFormation start building your stack, which you can verify in “Events” tab
 ![](./images/image9.png)
-![](./images/image17.png)
 
-In the Saved query you can check if your query is there which you deployed through CloudFormation. Run the saved query to get your results.
-![](./images/image19.png)
-![](./images/image6.png)
-
-After successful completion, your query results are saved in your S3 bucket output path.
+On completion of your stack you can check “Resources” tab for all resources created
 ![](./images/image16.png)
 
-## Step - 5
-Finally, you can clean the whole stack by deleting the CloudFormation stack to avoid any extra charges but for CloudWatch and S3 buckets you have to manually delete the data.
-![](./images/image11.png)
-![](./images/image15.png)
+Also in “Output” tab you can check your resources output like “Export name” creation
+![](./images/image1.png)
+
+## Step - 3
+To further verify resources, we can check one by one all created resources by going into their consoles.
+From AWS console, go to IAM console and click on “Roles” in left side panel and check role created by CloudFormation stack.
+![](./images/image31.png)
+
+From AWS console, go to S3 console, click on “Buckets” in left side panel and check S3 buckets are created by CloudFormation stack. There you’ll find one more bucket which is auto created by CloudFormation use.
+![](./images/image4.png)
+
+Go to AWS Glue console, click on “Databases” in left side panel and check glue database created by CloudFormation stack.
+![](./images/image2.png)
+
+In AWS Glue console, click on “Crawlers” in left side panel and check glue crawler created by CloudFormation stack.
+![](./images/image30.png)
+
+From AWS console, go to Amazon Athena console, click on “Workgroups” in left side panel and you can check workgroup is created by stack.
+![](./images/image19.png)
+
+## Step - 4
+As you can see, your whole infrastructure is created by cloudformation, you can further setup the things to test Amazon Athena.
 ![](./images/image20.png)
+
+Upload any data.csv file in to your S3 data bucket.
+![](./images/image28.png)
+
+Go to Glue Crawler, select your crawler and click “Run” button. As it’s already schedule to run every 6 hours which you can change according to your requirement in CloudFormation yaml file but for testing we need to run it manually.
+![](./images/image29.png)
+
+Crawler take some time and successfully complete.
+![](./images/image8.png)
+![](./images/image17.png)
+
+Meanwhile from AWS console go to CloudWatch, click on “Log groups” in left side panel and in right side click on log group created by crawler.
+![](./images/image27.png)
+
+Click on log stream created by crawler to check crawler logs.
+![](./images/image6.png)
+
+Glue crawler logs.
+![](./images/image21.png)
+
+Now from console go to Glue console, select “Tables” from left side panel and you can see glue crawler created a metadata table from our data.csv file.
+![](./images/image23.png)
+
+Now from Athena console, select “Query editor” from left side panel and you can see your glue database and metadata table already selected there.
+Now you have to change your workgroup that you created to run the queries on your data.
+![](./images/image13.png)
+
+As you can see our query is successfully completed.
+![](./images/image11.png)
+
+Now go to S3 console and select your query result bucket, you can see, your running query results are saved in that bucket.
+![](./images/image15.png)
+
+## Step - 5
+To avoid any charges from AWS please delete all the stack. To do that first you need to empty your S3 buckets and then go to CloudFormation and delete the stack.
+![](./images/image5.png)
+![](./images/image18.png)
+![](./images/image25.png)
+
+Also delete the CloudWatch log group.
+![](./images/image3.png)
+![](./images/image22.png)
+
+All your stack resources are deleted.
+![](./images/image7.png)
