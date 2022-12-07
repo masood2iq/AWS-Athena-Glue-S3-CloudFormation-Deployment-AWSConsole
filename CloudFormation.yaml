@@ -1,0 +1,195 @@
+# Sample CF YAML to demonstrate creating S3 buckets with Glue Database.
+AWSTemplateFormatVersion: '2010-09-09'
+
+# Parameters section contains name of the resource for your environment like staging, testing, production.
+Parameters:
+  Env:
+    Type: String
+
+# Resources section defines metadata for the Resources.
+# Create IAM Role assumed by the crawler. For demonstration, this role is given all permissions.
+Resources:
+   AWSAthenaGlueRole:
+     Type: AWS::IAM::Role
+     Properties:
+       AssumeRolePolicyDocument:
+         Version: "2012-10-17"
+         Statement:
+           - Effect: "Allow"
+             Principal:
+               Service:
+                 - "glue.amazonaws.com"
+             Action:
+               - "sts:AssumeRole"
+       Path: "/"
+       Policies:
+         - PolicyName: AWSAthenaAccess
+           PolicyDocument:
+             Statement:
+               - Effect: Allow
+                 Action: athena:*
+                 Resource: '*'
+         - PolicyName: GlueS3Access
+           PolicyDocument:
+             Statement:
+               - Effect: Allow
+                 Action:
+                   - glue:*
+                   - iam:ListRolePolicies
+                   - iam:GetRole
+                   - iam:GetRolePolicy
+                 Resource: '*'
+               - Effect: Allow
+                 Action:
+                   - s3:*
+                   - s3-object-lambda:*
+                 Resource: '*'
+               - Effect: Allow
+                 Action:
+                   - s3:GetObject
+                   - s3:PutObject
+                 Resource:
+                   - arn:aws:s3:::aws-glue-*/*
+                   - arn:aws:s3:::*/*aws-glue-*/*
+                   - arn:aws:s3:::aws-glue-*
+           PolicyName: AWSCloudWatchLogsAccess
+           PolicyDocument:
+             Statement:
+               - Effect: Allow
+                 Action:
+                   - logs:CreateLogGroup
+                   - logs:CreateLogStream
+                   - logs:GetLogEvents
+                   - logs:PutlogEvents
+                 Resource:
+                   - arn:aws:logs:*:*:/aws-glue/*
+
+# Create a S3 bucket for raw data.
+  RawDataBucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Sub raw-data-${AWS::AccountId}-${AWS::Region}-${Env}
+      BucketEncryption: 
+          ServerSideEncryptionConfiguration: 
+            - 
+              ServerSideEncryptionByDefault: 
+                  SSEAlgorithm: 'AES256'
+              BucketKeyEnabled: false
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+# Create a S3 bucket for query data backup.
+  AthenaQueryResultBucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Sub query-result-${AWS::AccountId}-${AWS::Region}-${Env}
+      BucketEncryption: 
+          ServerSideEncryptionConfiguration: 
+            - 
+              ServerSideEncryptionByDefault: 
+                  SSEAlgorithm: 'AES256'
+              BucketKeyEnabled: false
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration: 
+        Rules: 
+          - 
+            Id: 'auto-delete'
+            Status: 'Enabled'
+            ExpirationInDays: 7
+
+# Create athena workgroup for query.
+  AWSAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub athena-work-group-${Env}
+      Description: !Sub athena-work-group-${Env}
+      State: ENABLED
+      RecursiveDeleteOption: true
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        RequesterPaysEnabled: false        
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${AthenaQueryResultBucket}/data
+          EncryptionConfiguration: 
+            EncryptionOption: 'SSE_S3'
+        
+# Create a database to contain tables created by the crawler.
+  AWSGlueDatabase:
+    Type: AWS::Glue::Database
+    Properties: 
+      CatalogId: !Ref AWS::AccountId  
+      DatabaseInput:
+        Name: !Sub glue-database-${Env}
+
+# Create a crawler to crawl the data on a Raw Data S3 bucket
+  AWSGlueCrawler:
+    DependsOn:
+      - AWSAthenaGlueRole
+      - AWSGlueDatabase
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub glue-crawler-${Env}
+      Description: AWS Glue crawler to crawl data
+      Role: !GetAtt AWSAthenaGlueRole.Arn
+      #Schedule: none, use default run-on-demand
+      Schedule:
+        # Run crawler every day every 6 hours Monday to Friday
+        ScheduleExpression: 'cron(0 0/6 ? * MON-FRI *)'
+      DatabaseName: !Ref AWSGlueDatabase
+      Targets:
+        S3Targets:
+          # Raw Data S3 bucket with the data
+          - Path: !Ref RawDataBucket
+            Exclusions:
+              - "**.wav"
+              - "**.webm"
+              - "**.zip"
+              - "**.opus"
+              - "**.txt"
+      TablePrefix: !Sub glue-table-${Env}
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "LOG"
+      Configuration: "{\"Version\":1.0,\"CrawlerOutput\":{\"Partitions\":{\"AddOrUpdateBehavior\":\"InheritFromTable\"},\"Tables\":{\"AddOrUpdateBehavior\":\"MergeNewColumns\"}}}"
+
+# Create log group for glue crawler.
+  AWSGlueCrawlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws-glue/crawlers
+#      RetentionInDays: 1
+       
+# Show out put results after completon of Cloud Formation Stack.
+Outputs:
+  AWSAthenaGlueRole:
+    Value: !Ref AWSAthenaGlueRole
+    Export:
+      Name: !Sub "${Env}-AWSAthenaGlueRole-Name"
+  RawDataBucket:
+    Value: !Ref RawDataBucket
+    Export:
+      Name: !Sub "${Env}-RawDataBucket-Name"
+  AthenaQueryResultBucket:
+    Value: !Ref RawDataBucket
+    Export:
+      Name: !Sub "${Env}-AthenaQueryResultBucket-Name"
+  AWSAthenaWorkGroup:
+    Value: !Ref AWSAthenaWorkGroup
+    Export:
+      Name: !Sub "${Env}-AWSAthenaWorkGroup-Name"
+  AWSGlueDatabase:
+    Value: !Ref AWSGlueDatabase
+    Export:
+      Name: !Sub "${Env}-AWSGlueDatabase-Name"
+  AWSGlueCrawler:
+    Value: !Ref AWSGlueCrawler
+    Export:
+      Name: !Sub "${Env}-AWSGlueCrawler-Name"
